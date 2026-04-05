@@ -1,0 +1,88 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Source {
+  id          String   @id @default(cuid())
+  type        String   // 'youtube_video' | 'local_file' | 'podcast'
+  url         String?
+  filePath    String?
+  title       String?
+  durationSec Float?
+  initiative  String   // 'social_engine' | 'dark_channel' | 'consulting' | 'music'
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  jobs        Job[]
+  clips       Clip[]
+}
+
+model Job {
+  id          String    @id @default(cuid())
+  sourceId    String
+  source      Source    @relation(fields: [sourceId], references: [id])
+  type        String    // 'transcribe' | 'select' | 'reframe' | 'edit' | 'publish'
+  status      String    @default("queued") // 'queued' | 'running' | 'done' | 'failed'
+  input       String?   // JSON
+  output      String?   // JSON
+  error       String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model Clip {
+  id                String   @id @default(cuid())
+  sourceId          String
+  source            Source   @relation(fields: [sourceId], references: [id])
+  title             String?
+  startSec          Float?
+  endSec            Float?
+  hookStrength      Int?
+  valueDelivery     Int?
+  clarity           Int?
+  shareability      Int?
+  completeness      Int?
+  totalScore        Int?
+  category          String?
+  filePath          String?  // reframed 9:16 output
+  editedPath        String?  // Remotion render output
+  transcriptExcerpt String?
+  approved          Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  posts             Post[]
+}
+
+model Post {
+  id          String    @id @default(cuid())
+  clipId      String
+  clip        Clip      @relation(fields: [clipId], references: [id])
+  platform    String
+  latePostId  String?
+  title       String?
+  caption     String?
+  hashtags    String?   // JSON array
+  status      String?
+  publishedAt DateTime?
+  views       Int       @default(0)
+  likes       Int       @default(0)
+  shares      Int       @default(0)
+  comments    Int       @default(0)
+  createdAt   DateTime  @default(now())
+}
+
+model Lead {
+  id         String   @id @default(cuid())
+  source     String?  // 'youtube_comment' | 'linkedin_dm' | 'email'
+  initiative String?  // 'consulting' | 'music'
+  name       String?
+  contact    String?
+  content    String?
+  score      Int?
+  status     String   @default("new")
+  createdAt  DateTime @default(now())
+}

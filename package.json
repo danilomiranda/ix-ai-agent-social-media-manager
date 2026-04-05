@@ -6,9 +6,18 @@
   "scripts": {
     "studio": "npx remotion studio remotion/index.ts",
     "render": "npx remotion render remotion/index.ts",
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit",
+    "dev:api": "tsx watch src/api/server.ts",
+    "dev:worker": "tsx watch src/workers/index.ts",
+    "worker": "tsx src/workers/index.ts",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.0",
+    "@fastify/jwt": "^9.1.0",
+    "@prisma/client": "^6.6.0",
     "@remotion/cli": "4.0.414",
     "@remotion/google-fonts": "^4.0.414",
     "@remotion/media": "4.0.414",
@@ -16,13 +25,23 @@
     "@remotion/paths": "^4.0.417",
     "@remotion/renderer": "4.0.414",
     "@remotion/transitions": "4.0.414",
+    "axios": "^1.8.4",
+    "bullmq": "^5.44.0",
+    "chokidar": "^4.0.3",
+    "fastify": "^5.3.3",
+    "ioredis": "^5.6.1",
     "puppeteer": "^22.15.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "remotion": "4.0.414"
+    "remotion": "4.0.414",
+    "tsx": "^4.19.3",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/node": "^22.14.1",
     "@types/react": "^18.3.23",
+    "inquirer": "^12.5.2",
+    "prisma": "^6.6.0",
     "typescript": "^5.8.3"
   }
 }

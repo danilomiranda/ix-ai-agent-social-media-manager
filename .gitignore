@@ -4,3 +4,8 @@ __pycache__/
 *.pyc
 output/
 public/clips/
+prisma/dev.db
+prisma/dev.db-journal
+dist/
+input/*
+!input/.gitkeep

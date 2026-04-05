@@ -1,6 +1,6 @@
 # V2 System Architecture — IX AI Orchestration Platform
 
-> Date: 2026-04-04
+> Date: 2026-04-04 (revised 2026-04-05)
 > Author: Architecture session with Claude Code
 
 ---
@@ -69,6 +69,39 @@ Long-form video (local file)
 
 ## 2. TARGET ARCHITECTURE (V2 SYSTEM)
 
+### Language Split — Python Only Where It Has Real Advantages
+
+Python and Node.js split on a hard rule: **Python for ML/CV, Node.js for everything else.**
+
+| Domain | Runtime | Reason |
+|--------|---------|--------|
+| Face detection + tracking | **Python** | MediaPipe, OpenCV, TFLite/ONNX — no Node.js equivalent |
+| Kalman smoother, signal fusion | **Python** | NumPy, filterpy — numerical stack |
+| Transcription (WhisperX) | **Python** | GPU ML library, Python-only |
+| NLP preprocessing (VADER, spaCy) | **Python** | No Node.js equivalent at this quality |
+| Web server | **Node.js** | Fastify — your comfort zone, faster than FastAPI |
+| Job queue + workers | **Node.js** | BullMQ — TypeScript-native, more mature than ARQ |
+| AI agent calls (Claude API) | **Node.js** | `@anthropic-ai/sdk` — official, first-class |
+| Database ORM | **Node.js** | Prisma or Drizzle |
+| File watcher | **Node.js** | chokidar |
+| All REST API clients | **Node.js** | axios/got |
+| Cron scheduling | **Node.js** | BullMQ cron jobs |
+| Remotion rendering | **Node.js** | Already Node.js |
+| Business logic (agents, copy, leads) | **Node.js** | |
+
+**Python becomes two headless CLI tools**, invoked via `child_process.spawn` from Node.js workers:
+
+```
+Node.js (orchestrator — everything)
+  └── child_process.spawn → Python (CV + transcription only)
+        ├── python -m clip_extractor reframe --video ... --output ...
+        └── python -m transcriber --video ... --output ...
+```
+
+Python processes are fire-and-forget subprocesses. They write output to disk. Node.js reads the result. No Python HTTP server needed.
+
+---
+
 ### Design Philosophy
 
 **Monorepo, modular services.** Not microservices — you're one person. The system should be deployable as a single process on a single machine, but factored so each domain can be extracted into a service when you need to scale. The decision boundary is: "does this need to run while I'm asleep?" If yes, it needs to be a background worker.
@@ -76,188 +109,203 @@ Long-form video (local file)
 **Layered architecture:**
 
 ```
-┌──────────────────────────────────────────────────────────┐
+┌───────────────────────────────────────────────────────────┐
 │                    INGESTION LAYER                        │
 │  Watch folders / Webhooks / RSS / Manual drop             │
-├──────────────────────────────────────────────────────────┤
+├───────────────────────────────────────────────────────────┤
 │                   PROCESSING LAYER                        │
 │  Transcription · Face tracking · Clip extraction          │
-├──────────────────────────────────────────────────────────┤
+├───────────────────────────────────────────────────────────┤
 │              CONTENT INTELLIGENCE LAYER                   │
 │  Viral scoring · Hook analysis · Topic clustering         │
-├──────────────────────────────────────────────────────────┤
+├───────────────────────────────────────────────────────────┤
 │               TRANSFORMATION LAYER                        │
 │  Remotion edit · Caption gen · Thumbnail · Carousel       │
-├──────────────────────────────────────────────────────────┤
+├───────────────────────────────────────────────────────────┤
 │                 DISTRIBUTION LAYER                        │
 │  Late API · Direct APIs · Scheduling · Queue              │
-├──────────────────────────────────────────────────────────┤
+├───────────────────────────────────────────────────────────┤
 │                     DATA LAYER                            │
 │  SQLite → Postgres · Vector DB · Analytics · Feedback     │
-└──────────────────────────────────────────────────────────┘
+└───────────────────────────────────────────────────────────┘
 ```
 
 ### Target Folder Structure
 
 ```
 ix-platform/
-├── core/                           # Shared contracts + utils
-│   ├── schemas/                    # Pydantic models (Job, Clip, Post, Lead)
-│   ├── config.py                   # Env-based config (pydantic-settings)
-│   └── db.py                       # SQLite/Postgres ORM (SQLModel)
+├── src/                            # Node.js — all orchestration + business logic
+│   │
+│   ├── api/                        # Fastify web server
+│   │   ├── server.ts               # Fastify app setup
+│   │   ├── routes/
+│   │   │   ├── ingest.ts           # POST /ingest — receive video + metadata
+│   │   │   ├── jobs.ts             # GET /jobs/:id — status polling
+│   │   │   ├── clips.ts            # GET /clips/pending, POST /clips/:id/approve
+│   │   │   └── webhooks.ts         # YouTube/Late push callbacks
+│   │   └── auth.ts                 # API key middleware
+│   │
+│   ├── workers/                    # BullMQ workers — one file per queue
+│   │   ├── transcribe.worker.ts    # spawn Python transcriber subprocess
+│   │   ├── select.worker.ts        # Claude API clip selection
+│   │   ├── reframe.worker.ts       # spawn Python clip_extractor subprocess
+│   │   ├── edit.worker.ts          # Remotion render (npx remotion render)
+│   │   ├── publish.worker.ts       # Late API distribution
+│   │   └── feedback.worker.ts      # Analytics pull → scoring weights update
+│   │
+│   ├── agents/                     # Claude API agents (Anthropic SDK)
+│   │   ├── base.ts                 # Shared run_agent() wrapper
+│   │   ├── clip-selector.ts        # Viral moment detection + scoring
+│   │   ├── copywriter.ts           # Platform-specific post copy
+│   │   ├── strategist.ts           # Content calendar decisions
+│   │   ├── growth.ts               # SEO, hashtags, trends
+│   │   └── outreach.ts             # Consulting + music venue outreach
+│   │
+│   ├── intelligence/               # Deterministic pre-scoring (no LLM)
+│   │   ├── viral-prescreener.ts    # Regex patterns, density, filler detection
+│   │   └── sentiment.ts            # Sentiment volatility via simple scoring
+│   │
+│   ├── distribution/               # Publishing layer
+│   │   ├── late-client.ts          # Late API client with retry (tenacity-style)
+│   │   └── platform-adapters/      # Per-platform copy formatting rules
+│   │       ├── youtube.ts
+│   │       ├── tiktok.ts
+│   │       ├── linkedin.ts
+│   │       └── instagram.ts
+│   │
+│   ├── business/                   # Business integrations
+│   │   ├── consulting/
+│   │   │   ├── case-study-gen.ts   # CaseStudy agent wrapper
+│   │   │   ├── lead-magnet-gen.ts
+│   │   │   └── notion-crm.ts       # Notion API client
+│   │   └── music/
+│   │       ├── venue-outreach.ts
+│   │       └── show-packager.ts
+│   │
+│   ├── db/                         # Prisma ORM
+│   │   ├── schema.prisma
+│   │   └── client.ts
+│   │
+│   ├── queue/                      # BullMQ queue definitions
+│   │   └── queues.ts
+│   │
+│   ├── ingestion/                  # Event sources
+│   │   ├── watcher.ts              # chokidar file watcher
+│   │   └── rss.ts                  # Podcast RSS poller
+│   │
+│   └── config.ts                   # Env config with zod validation
 │
-├── ingestion/                      # Layer 1: Event sources
-│   ├── watcher.py                  # Watchdog: folder monitor (video drops)
-│   ├── webhook.py                  # FastAPI: YouTube/Late/CRM webhooks
-│   └── rss.py                      # Podcast RSS poller
+├── python/                         # Python — CV + transcription ONLY
+│   ├── transcriber/
+│   │   ├── __main__.py             # CLI: python -m transcriber --video ... --output ...
+│   │   └── whisperx_runner.py      # WhisperX → .srt + .words.json
+│   └── clip_extractor/             # Existing tools/clip_extractor/ (moved here)
+│       └── ...                     # Unchanged
 │
-├── processing/                     # Layer 2: Heavy compute
-│   ├── transcriber.py              # WhisperX → word-level SRT + JSON
-│   ├── clip_selector.py            # Claude API call → scored clip JSON
-│   └── reframer/                   # Existing tools/clip_extractor/ (unchanged)
+├── remotion/                       # Existing Remotion (unchanged)
+├── .claude/                        # Existing skill system (unchanged)
+├── tools/                          # srt_to_words.py + legacy (keep for now)
 │
-├── intelligence/                   # Layer 3: AI analysis
-│   ├── viral_scorer.py             # Heuristic + LLM hybrid scorer
-│   ├── hook_extractor.py           # First-3-second hook quality
-│   ├── topic_tagger.py             # Embedding-based topic clustering
-│   └── trend_monitor.py            # Twitter/TikTok trend polling
-│
-├── transformation/                 # Layer 4: Content generation
-│   ├── remotion_runner.py          # Programmatic Remotion render orchestration
-│   ├── copywriter.py               # Platform-specific post copy (Claude API)
-│   ├── thumbnail_gen.py            # KIE.ai + face composite orchestration
-│   └── carousel_gen.py             # Document carousel HTML → PDF → PNG
-│
-├── distribution/                   # Layer 5: Publishing
-│   ├── publisher.py                # Late API client with retry + queue
-│   ├── scheduler.py                # Cron-based post timing
-│   └── platform_adapters/          # Per-platform formatting rules
-│       ├── youtube.py
-│       ├── tiktok.py
-│       ├── linkedin.py
-│       └── instagram.py
-│
-├── data/                           # Layer 6: Persistence
-│   ├── migrations/                 # Alembic
-│   ├── models.py                   # SQLModel ORM models
-│   ├── vector_store.py             # ChromaDB/Qdrant client
-│   └── analytics.py               # Performance aggregation queries
-│
-├── agents/                         # Agent definitions (Claude API)
-│   ├── content_strategist.py
-│   ├── viral_detector.py
-│   ├── copywriter.py
-│   ├── growth_agent.py
-│   └── outreach_agent.py
-│
-├── business/                       # Business-layer integrations
-│   ├── consulting/
-│   │   ├── case_study_gen.py
-│   │   ├── lead_magnet_gen.py
-│   │   └── crm_sync.py             # HubSpot/Notion CRM
-│   └── music/
-│       ├── venue_outreach.py
-│       └── show_packager.py
-│
-├── api/                            # REST API (future SaaS surface)
-│   ├── main.py                     # FastAPI app
-│   ├── routers/
-│   └── auth.py                     # API key / JWT
-│
-├── worker/                         # Background workers
-│   ├── pipeline_worker.py          # Main processing loop (ARQ/Celery)
-│   └── feedback_worker.py          # Analytics → scoring feedback loop
-│
-├── .claude/                        # Existing skill system (keep as-is)
-├── remotion/                       # Existing Remotion (keep as-is)
-├── tools/                          # Existing Python tools (keep as-is)
-│
-├── docker-compose.yml
-├── pyproject.toml                  # Python deps (uv)
-└── package.json                    # Node deps (Remotion)
+├── prisma/
+│   └── schema.prisma
+├── docker-compose.yml              # Redis only (no Python container needed)
+├── pyproject.toml                  # Python deps — CV stack only
+├── package.json                    # Node deps — everything else
+└── tsconfig.json
 ```
 
-### Database Schema (Core Tables)
+### Database Schema (Prisma)
 
-```sql
--- Source content
-CREATE TABLE sources (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  type TEXT NOT NULL,           -- 'youtube_video' | 'local_file' | 'podcast'
-  url TEXT,
-  file_path TEXT,
-  title TEXT,
-  duration_sec FLOAT,
-  initiative TEXT NOT NULL,     -- 'social_engine' | 'dark_channel' | 'consulting' | 'music'
-  status TEXT DEFAULT 'pending',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+```prisma
+// prisma/schema.prisma
 
--- Processing jobs
-CREATE TABLE jobs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  source_id UUID REFERENCES sources(id),
-  type TEXT NOT NULL,           -- 'transcribe' | 'select' | 'reframe' | 'edit' | 'publish'
-  status TEXT DEFAULT 'queued', -- 'queued' | 'running' | 'done' | 'failed'
-  input JSONB,
-  output JSONB,
-  error TEXT,
-  started_at TIMESTAMPTZ,
-  completed_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+datasource db {
+  provider = "sqlite"   // → "postgresql" when moving to prod
+  url      = env("DATABASE_URL")
+}
 
--- Extracted clips
-CREATE TABLE clips (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  source_id UUID REFERENCES sources(id),
-  title TEXT,
-  start_sec FLOAT,
-  end_sec FLOAT,
-  hook_strength INT,
-  value_delivery INT,
-  clarity INT,
-  shareability INT,
-  completeness INT,
-  total_score INT,
-  category TEXT,
-  file_path TEXT,               -- reframed 9:16 output
-  edited_path TEXT,             -- Remotion render output
-  transcript_excerpt TEXT,
-  embedding vector(1536),       -- pgvector for semantic search
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+generator client {
+  provider = "prisma-client-js"
+}
 
--- Published posts
-CREATE TABLE posts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  clip_id UUID REFERENCES clips(id),
-  platform TEXT,
-  late_post_id TEXT,
-  title TEXT,
-  caption TEXT,
-  hashtags TEXT[],
-  status TEXT,
-  published_at TIMESTAMPTZ,
-  views INT DEFAULT 0,
-  likes INT DEFAULT 0,
-  shares INT DEFAULT 0,
-  comments INT DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+model Source {
+  id          String   @id @default(cuid())
+  type        String   // 'youtube_video' | 'local_file' | 'podcast'
+  url         String?
+  filePath    String?
+  title       String?
+  durationSec Float?
+  initiative  String   // 'social_engine' | 'dark_channel' | 'consulting' | 'music'
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  jobs        Job[]
+  clips       Clip[]
+}
 
--- Leads (consulting + music)
-CREATE TABLE leads (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  source TEXT,                  -- 'youtube_comment' | 'linkedin_dm' | 'email'
-  initiative TEXT,              -- 'consulting' | 'music'
-  name TEXT,
-  contact TEXT,
-  content TEXT,
-  score INT,
-  status TEXT DEFAULT 'new',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+model Job {
+  id          String    @id @default(cuid())
+  sourceId    String
+  source      Source    @relation(fields: [sourceId], references: [id])
+  type        String    // 'transcribe' | 'select' | 'reframe' | 'edit' | 'publish'
+  status      String    @default("queued")
+  input       String?   // JSON
+  output      String?   // JSON
+  error       String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model Clip {
+  id                String   @id @default(cuid())
+  sourceId          String
+  source            Source   @relation(fields: [sourceId], references: [id])
+  title             String?
+  startSec          Float?
+  endSec            Float?
+  hookStrength      Int?
+  valueDelivery     Int?
+  clarity           Int?
+  shareability      Int?
+  completeness      Int?
+  totalScore        Int?
+  category          String?
+  filePath          String?  // reframed 9:16 output
+  editedPath        String?  // Remotion render output
+  transcriptExcerpt String?
+  createdAt         DateTime @default(now())
+  posts             Post[]
+}
+
+model Post {
+  id          String    @id @default(cuid())
+  clipId      String
+  clip        Clip      @relation(fields: [clipId], references: [id])
+  platform    String
+  latePostId  String?
+  title       String?
+  caption     String?
+  hashtags    String?   // JSON array
+  status      String?
+  publishedAt DateTime?
+  views       Int       @default(0)
+  likes       Int       @default(0)
+  shares      Int       @default(0)
+  comments    Int       @default(0)
+  createdAt   DateTime  @default(now())
+}
+
+model Lead {
+  id        String   @id @default(cuid())
+  source    String?  // 'youtube_comment' | 'linkedin_dm' | 'email'
+  initiative String? // 'consulting' | 'music'
+  name      String?
+  contact   String?
+  content   String?
+  score     Int?
+  status    String   @default("new")
+  createdAt DateTime @default(now())
+}
 ```
 
 ### Monolith vs Microservices Recommendation
@@ -272,35 +320,33 @@ CREATE TABLE leads (
 
 ## 3. AI AGENT DESIGN
 
-Use the **Claude API with tool use** for all agents. Each agent is a Python function that constructs a system prompt, assembles context, calls Claude, and returns a typed Pydantic object. No LangChain, no agent framework overhead.
+Use the **Claude API** for all agents via the official `@anthropic-ai/sdk` Node.js package. Each agent is a TypeScript function that constructs a system prompt, assembles context, calls Claude, and returns a typed object. No LangChain, no framework overhead.
 
 ### Agent Pattern (shared)
 
-```python
-# core/agent_base.py
-import anthropic
-from pydantic import BaseModel
-from typing import TypeVar, Type
+```typescript
+// src/agents/base.ts
+import Anthropic from '@anthropic-ai/sdk';
+import { z } from 'zod';
 
-T = TypeVar("T", bound=BaseModel)
+const client = new Anthropic(); // uses ANTHROPIC_API_KEY env
 
-client = anthropic.Anthropic()
+export async function runAgent<T>(opts: {
+  system: string;
+  userMessage: string;
+  schema: z.ZodType<T>;
+  model?: string;
+}): Promise<T> {
+  const response = await client.messages.create({
+    model: opts.model ?? 'claude-opus-4-6',
+    max_tokens: 4096,
+    system: opts.system,
+    messages: [{ role: 'user', content: opts.userMessage }],
+  });
 
-def run_agent(
-    system: str,
-    user_message: str,
-    output_schema: Type[T],
-    model: str = "claude-opus-4-6",
-    tools: list | None = None,
-) -> T:
-    response = client.messages.create(
-        model=model,
-        max_tokens=4096,
-        system=system,
-        messages=[{"role": "user", "content": user_message}],
-        tools=tools or [],
-    )
-    return output_schema.model_validate_json(response.content[0].text)
+  const text = response.content[0].type === 'text' ? response.content[0].text : '';
+  return opts.schema.parse(JSON.parse(text));
+}
 ```
 
 ---
@@ -310,23 +356,30 @@ def run_agent(
 **Purpose:** Given a long-form video transcript + channel analytics, decide what content to produce, for which platforms, and when.
 
 **Input:**
-```python
-class ContentStrategyInput(BaseModel):
-    transcript_summary: str          # 500-word LLM summary of video
-    channel_analytics: dict          # Top posts, avg engagement, follower segments
-    trending_topics: list[str]       # From trend_monitor.py
-    content_backlog: list[str]       # Pending clips not yet posted
-    voice_dna: str                   # Full Voice DNA profile
+```typescript
+interface ContentStrategyInput {
+  transcriptSummary: string;       // 500-word LLM summary of video
+  channelAnalytics: object;        // Top posts, avg engagement, follower segments
+  trendingTopics: string[];        // From trend monitor
+  contentBacklog: string[];        // Pending clips not yet posted
+  voiceDna: string;                // Full Voice DNA profile
+}
 ```
 
 **Output:**
-```python
-class ContentPlan(BaseModel):
-    priority_clips: list[str]        # Clip IDs to process this week, ranked
-    platform_matrix: dict[str, list] # {"tiktok": [clip_1, clip_3], "linkedin": [clip_2]}
-    posting_schedule: list[PostSlot] # Datetime + platform + clip_id
-    content_gaps: list[str]          # Topics missing from recent output
-    recommended_hooks: list[str]     # 3 hook variations per top clip
+```typescript
+const ContentPlanSchema = z.object({
+  priorityClips: z.array(z.string()),            // Clip IDs ranked by priority
+  platformMatrix: z.record(z.array(z.string())), // { tiktok: [clip_1], linkedin: [clip_2] }
+  postingSchedule: z.array(z.object({
+    clipId: z.string(),
+    platform: z.string(),
+    scheduledAt: z.string(),        // ISO datetime
+  })),
+  contentGaps: z.array(z.string()),
+  recommendedHooks: z.array(z.string()),
+});
+type ContentPlan = z.infer<typeof ContentPlanSchema>;
 ```
 
 **System prompt strategy:**
@@ -352,46 +405,53 @@ Rules:
 **Purpose:** Score transcript segments for short-form virality potential. This is the LLM layer of the scoring pipeline — heuristics handle syntax, LLM handles semantics.
 
 **Input:**
-```python
-class ViralDetectorInput(BaseModel):
-    transcript_segments: list[TranscriptSegment]
-    source_category: str              # "podcast" | "tutorial" | "performance" | "case_study"
-    target_duration_range: tuple[int, int]  # (45, 90) seconds
-    previous_scores: list[dict] | None      # Historical clip performance for calibration
+```typescript
+interface TranscriptSegment {
+  text: string;
+  startSec: number;
+  endSec: number;
+  duration: number;
+}
+
+interface ViralDetectorInput {
+  segments: TranscriptSegment[];
+  sourceCategory: 'podcast' | 'tutorial' | 'performance' | 'case_study';
+  targetDurationRange: [number, number]; // [45, 90]
+  previousScores?: Array<{ category: string; avgScore: number; avgEngagement: number }>;
+}
 ```
 
 **Output:**
-```python
-class ScoredClip(BaseModel):
-    start_words: str       # Verbatim anchor, 5-8 words
-    end_words: str
-    start_sec_estimate: float
-    end_sec_estimate: float
-    hook_strength: int     # 0-20
-    value_delivery: int
-    clarity: int
-    shareability: int
-    completeness: int
-    total_score: int
-    category: str
-    hook_pattern: str      # "bold_claim" | "stat" | "problem_statement" | "reframe"
-    best_improvement: str
+```typescript
+const ScoredClipSchema = z.object({
+  startWords: z.string(),        // Verbatim anchor, 5-8 words
+  endWords: z.string(),
+  startSecEstimate: z.number(),
+  endSecEstimate: z.number(),
+  hookStrength: z.number(),      // 0-20
+  valueDelivery: z.number(),
+  clarity: z.number(),
+  shareability: z.number(),
+  completeness: z.number(),
+  totalScore: z.number(),
+  category: z.string(),
+  hookPattern: z.string(),       // "bold_claim" | "stat" | "problem_statement" | "reframe"
+  bestImprovement: z.string(),
+});
 ```
 
 **Deterministic pre-filters (run before LLM call):**
-```python
-def prescreen_segments(segments: list) -> list:
-    filtered = []
-    for seg in segments:
-        if re.match(r'^(so|um|okay|anyway|like i was)', seg.text.lower()):
-            continue
-        if not (40 <= seg.duration <= 95):
-            continue
-        word_count = len(seg.text.split())
-        if word_count / seg.duration < 1.5:  # < 1.5 words/sec = too sparse
-            continue
-        filtered.append(seg)
-    return filtered
+```typescript
+// src/intelligence/viral-prescreener.ts
+function prescreenSegments(segments: TranscriptSegment[]): TranscriptSegment[] {
+  return segments.filter(seg => {
+    if (/^(so|um|okay|anyway|like i was)/i.test(seg.text.trim())) return false;
+    if (seg.duration < 40 || seg.duration > 95) return false;
+    const wordCount = seg.text.split(/\s+/).length;
+    if (wordCount / seg.duration < 1.5) return false; // too sparse
+    return true;
+  });
+}
 ```
 
 **Where LLM vs deterministic:**
@@ -413,15 +473,16 @@ def prescreen_segments(segments: list) -> list:
 **Purpose:** Generate Remotion composition code (.tsx) and word-timed pop-out data (.ts) for a given clip + scoring context.
 
 **Input:**
-```python
-class EditRequest(BaseModel):
-    clip_path: str
-    transcript_srt: str
-    score: ScoredClip
-    format: str               # "short-form-pipeline" | "short-form-standalone" | "long-form"
-    style_variant: str        # From remotion/playbook/styles/
-    cta_text: str | None
-    source_video_title: str | None
+```typescript
+interface EditRequest {
+  clipPath: string;
+  transcriptSrt: string;
+  score: z.infer<typeof ScoredClipSchema>;
+  format: 'short-form-pipeline' | 'short-form-standalone' | 'long-form';
+  styleVariant: string;       // From remotion/playbook/styles/
+  ctaText?: string;
+  sourceVideoTitle?: string;
+}
 ```
 
 **Output:** Generated `.tsx` file content + `.ts` word data file content (returned as strings, written to disk by caller).
@@ -435,25 +496,27 @@ class EditRequest(BaseModel):
 **Purpose:** Generate platform-specific post copy that matches Voice DNA.
 
 **Input:**
-```python
-class CopyRequest(BaseModel):
-    clip_score: ScoredClip
-    transcript_excerpt: str
-    platform: str                # "twitter" | "linkedin" | "instagram" | "tiktok" | "youtube"
-    voice_dna: str
-    post_history: list[str]      # Last 10 posts on this platform (dedup check)
+```typescript
+interface CopyRequest {
+  clipScore: z.infer<typeof ScoredClipSchema>;
+  transcriptExcerpt: string;
+  platform: 'twitter' | 'linkedin' | 'instagram' | 'tiktok' | 'youtube';
+  voiceDna: string;
+  postHistory: string[];         // Last 10 posts on this platform (dedup check)
+}
 ```
 
 **Output:**
-```python
-class PlatformCopy(BaseModel):
-    platform: str
-    title: str | None            # YouTube only
-    body: str
-    hashtags: list[str]
-    cta: str
-    char_count: int
-    hook_type: str
+```typescript
+const PlatformCopySchema = z.object({
+  platform: z.string(),
+  title: z.string().optional(),  // YouTube only
+  body: z.string(),
+  hashtags: z.array(z.string()),
+  cta: z.string(),
+  charCount: z.number(),
+  hookType: z.string(),
+});
 ```
 
 **Platform constraints baked into system prompt:**
@@ -473,13 +536,14 @@ YouTube:   SEO title 60 chars, description with timestamps, 500-word body
 **Purpose:** Research trends, generate hashtag sets, suggest content angles.
 
 **Output:**
-```python
-class GrowthPackage(BaseModel):
-    trending_hashtags: list[str]
-    trending_audio: list[str]        # TikTok/Reels audio trends
-    competitor_hooks: list[str]      # What's working in adjacent accounts
-    content_angle_variations: list[str]
-    optimal_post_times: dict         # {"tiktok": "18:00-20:00 EST", ...}
+```typescript
+const GrowthPackageSchema = z.object({
+  trendingHashtags: z.array(z.string()),
+  trendingAudio: z.array(z.string()),          // TikTok/Reels audio trends
+  competitorHooks: z.array(z.string()),
+  contentAngleVariations: z.array(z.string()),
+  optimalPostTimes: z.record(z.string()),       // { tiktok: "18:00-20:00 EST" }
+});
 ```
 
 ---
@@ -489,24 +553,26 @@ class GrowthPackage(BaseModel):
 **Purpose:** Generate personalized outreach for consulting leads and venue bookings.
 
 **Input:**
-```python
-class OutreachTarget(BaseModel):
-    target_type: str          # "consulting_lead" | "venue" | "collaborator"
-    target_name: str
-    target_description: str
-    context: str
-    offer: str
-    your_recent_content: list[str]
+```typescript
+interface OutreachTarget {
+  targetType: 'consulting_lead' | 'venue' | 'collaborator';
+  targetName: string;
+  targetDescription: string;
+  context: string;
+  offer: string;
+  yourRecentContent: string[];
+}
 ```
 
 **Output:**
-```python
-class OutreachMessage(BaseModel):
-    subject: str
-    body: str
-    follow_up_day3: str
-    follow_up_day7: str
-    personalization_signals: list[str]
+```typescript
+const OutreachMessageSchema = z.object({
+  subject: z.string(),
+  body: z.string(),
+  followUpDay3: z.string(),
+  followUpDay7: z.string(),
+  personalizationSignals: z.array(z.string()),
+});
 ```
 
 ---
@@ -584,32 +650,53 @@ INPUT: long-form video (.mp4, .mov)
 ### Viral Moment Detection — Signal Stack
 
 **Signal 1 — Information Density (deterministic)**
-```python
-def information_density_score(segment: Segment) -> float:
-    words_per_sec = len(segment.text.split()) / segment.duration
-    unique_noun_ratio = len(set(extract_nouns(segment.text))) / len(segment.text.split())
-    return (words_per_sec * 0.6) + (unique_noun_ratio * 40)
+```typescript
+// src/intelligence/viral-prescreener.ts
+function informationDensityScore(segment: TranscriptSegment): number {
+  const words = segment.text.split(/\s+/);
+  const wordsPerSec = words.length / segment.duration;
+  // Count unique content words (skip stopwords)
+  const stopwords = new Set(['the','a','an','is','it','of','and','or','in','to','for']);
+  const contentWords = new Set(words.filter(w => !stopwords.has(w.toLowerCase())));
+  const uniqueRatio = contentWords.size / words.length;
+  return (wordsPerSec * 0.6) + (uniqueRatio * 40);
+}
 ```
 
 **Signal 2 — Pattern Matching (deterministic)**
-```python
-VIRAL_PATTERNS = {
-    "stat_hook":    r'\b\d+[%xX]?\b.*\b(in|within|after)\b.*\b(days?|weeks?|months?)\b',
-    "bold_claim":   r'^(The (truth|reality|problem|issue)|Most people|Nobody tells you|Stop)',
-    "reframe":      r'\b(actually|wrong|myth|lie|mistake)\b',
-    "result_reveal":r'\b(made|earned|generated|reached|grew)\b.*\b\$?\d+[kKmM]?\b',
-    "framework":    r'\b(step \d|rule \d|\d\s+things|formula|system|framework)\b',
+```typescript
+const VIRAL_PATTERNS: Record<string, RegExp> = {
+  stat_hook:     /\b\d+[%xX]?\b.*\b(in|within|after)\b.*\b(days?|weeks?|months?)\b/i,
+  bold_claim:    /^(The (truth|reality|problem|issue)|Most people|Nobody tells you|Stop)/i,
+  reframe:       /\b(actually|wrong|myth|lie|mistake)\b/i,
+  result_reveal: /\b(made|earned|generated|reached|grew)\b.*\b\$?\d+[kKmM]?\b/i,
+  framework:     /\b(step \d|rule \d|\d\s+things|formula|system|framework)\b/i,
+};
+
+function patternScore(text: string): Record<string, boolean> {
+  return Object.fromEntries(
+    Object.entries(VIRAL_PATTERNS).map(([k, re]) => [k, re.test(text)])
+  );
 }
 ```
 
 **Signal 3 — Sentiment Volatility (deterministic)**
-```python
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-analyzer = SentimentIntensityAnalyzer()
+```typescript
+// Simple polarity scoring without external deps
+const POSITIVE = new Set(['great','amazing','incredible','best','love','perfect','brilliant']);
+const NEGATIVE = new Set(['wrong','bad','worst','terrible','broken','fail','mistake']);
 
-def sentiment_volatility(sentences: list[str]) -> float:
-    scores = [analyzer.polarity_scores(s)['compound'] for s in sentences]
-    return float(np.std(scores))  # High std = emotional range = engaging
+function sentimentVolatility(sentences: string[]): number {
+  const scores = sentences.map(s => {
+    const words = s.toLowerCase().split(/\s+/);
+    const pos = words.filter(w => POSITIVE.has(w)).length;
+    const neg = words.filter(w => NEGATIVE.has(w)).length;
+    return (pos - neg) / Math.max(words.length, 1);
+  });
+  const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+  const variance = scores.reduce((a, b) => a + (b - mean) ** 2, 0) / scores.length;
+  return Math.sqrt(variance); // std dev — high = emotional range
+}
 ```
 
 **LLM call strategy:** Run deterministic signals first. Only send **top 20 segments** (by combined score) to Claude for semantic scoring. Cuts API cost ~70% on a 60-minute video.
@@ -624,41 +711,54 @@ def sentiment_volatility(sentences: list[str]) -> float:
 
 ## 5. AUTOMATION + ORCHESTRATION
 
-### Queue Architecture (ARQ + Redis)
+### Queue Architecture (BullMQ + Redis)
 
-```python
-# worker/pipeline_worker.py
-from arq import cron
-from arq.connections import RedisSettings
+```typescript
+// src/queue/queues.ts
+import { Queue, Worker } from 'bullmq';
+import { connection } from './redis';
 
-async def transcribe(ctx, job: dict): ...
-async def clip_select(ctx, job: dict): ...
-async def reframe(ctx, job: dict): ...
-async def edit_composition(ctx, job: dict): ...
-async def publish(ctx, job: dict): ...
-
-class WorkerSettings:
-    functions = [transcribe, clip_select, reframe, edit_composition, publish]
-    redis_settings = RedisSettings(host="localhost", port=6379)
-    max_jobs = 3        # Don't overwhelm local GPU
-    job_timeout = 3600  # 1hr max per job
-
-    cron_jobs = [
-        cron(trend_monitor_refresh, hour={9, 21}),       # Twice daily
-        cron(analytics_feedback_loop, hour=3),           # 3am daily
-        cron(outreach_queue_processor, hour={10, 15}),   # Business hours
-    ]
+export const queues = {
+  transcribe: new Queue('transcribe', { connection }),
+  select:     new Queue('select',     { connection }),
+  reframe:    new Queue('reframe',    { connection }),
+  edit:       new Queue('edit',       { connection }),
+  publish:    new Queue('publish',    { connection }),
+};
 ```
 
-**Pipeline chaining (fan-out):**
-```python
-async def transcribe(ctx, job: dict):
-    result = run_whisperx(job["source_path"])
-    await ctx["redis"].enqueue_job("clip_select", {
-        "transcript": result.srt_path,
-        "source_video": job["source_path"],
-        "parent_job_id": job["id"],
-    })
+```typescript
+// src/workers/transcribe.worker.ts
+import { Worker } from 'bullmq';
+import { spawn } from 'child_process';
+import { queues } from '../queue/queues';
+
+new Worker('transcribe', async (job) => {
+  const { sourcePath, outputDir } = job.data;
+
+  // Invoke Python transcriber as subprocess
+  await spawnAsync('python', [
+    '-m', 'transcriber',
+    '--video', sourcePath,
+    '--output', outputDir,
+  ], { cwd: 'python' });
+
+  // Fan out to next stage
+  await queues.select.add('clip-select', {
+    transcriptPath: `${outputDir}/transcript.srt`,
+    sourcePath,
+    parentJobId: job.id,
+  });
+}, { connection, concurrency: 2 });
+```
+
+**Cron jobs (BullMQ scheduler):**
+```typescript
+import { QueueScheduler } from 'bullmq';
+
+await queues.publish.add('trend-refresh',   {}, { repeat: { cron: '0 9,21 * * *' } });
+await queues.publish.add('analytics-pull',  {}, { repeat: { cron: '0 3 * * *'   } });
+await queues.publish.add('outreach-batch',  {}, { repeat: { cron: '0 10,15 * * 1-5' } });
 ```
 
 ### Scheduling Matrix
@@ -675,15 +775,19 @@ async def transcribe(ctx, job: dict):
 
 ### Python vs Node Responsibilities
 
-| Python | Node/TypeScript |
-|--------|----------------|
-| Video processing (CV, FFmpeg) | Remotion compositions (.tsx) |
-| Transcription (WhisperX) | SRT → word data (.ts) |
-| All AI agent calls (Claude API) | Remotion rendering (subprocess) |
-| Pipeline orchestration (ARQ) | — |
-| API server (FastAPI) | — |
-| CRM/outreach integrations | — |
-| Analytics + DB | — |
+| Python | Node.js/TypeScript |
+|--------|-------------------|
+| Face detection + tracking (MediaPipe, OpenCV) | Everything else |
+| Kalman smoother, signal fusion (NumPy, filterpy) | Fastify API server |
+| Transcription (WhisperX — GPU ML) | BullMQ job queue + workers |
+| NLP preprocessing (vaderSentiment, spaCy) | All Claude API agent calls |
+| TFLite/ONNX model inference | Prisma/Drizzle ORM |
+| — | chokidar file watcher |
+| — | Late/KIE/Notion API clients |
+| — | Remotion rendering |
+| — | Business logic + outreach |
+
+Python runs as **CLI subprocesses only** — no HTTP server, no long-running Python process.
 
 ---
 
@@ -704,34 +808,46 @@ Long-form recording (client call, workshop, tutorial)
 ```
 
 **Case study generator:**
-```python
-class CaseStudyInput(BaseModel):
-    client_description: str
-    problem_before: str
-    solution_implemented: str
-    results: dict               # Metrics: time saved, revenue, leads
-    client_quote: str | None
+```typescript
+// src/business/consulting/case-study-gen.ts
+interface CaseStudyInput {
+  clientDescription: string;
+  problemBefore: string;
+  solutionImplemented: string;
+  results: Record<string, string | number>;
+  clientQuote?: string;
+}
 
-class CaseStudy(BaseModel):
-    linkedin_post: str          # Authority post (problem → system → result)
-    short_form_script: str      # 60s short
-    lead_magnet_title: str
-    email_sequence: list[str]   # 3-email nurture from lead magnet download
+const CaseStudySchema = z.object({
+  linkedinPost: z.string(),       // problem → system → result
+  shortFormScript: z.string(),    // 60s short
+  leadMagnetTitle: z.string(),
+  emailSequence: z.array(z.string()),  // 3-email nurture
+});
 ```
 
 **CRM sync (Notion):**
-```python
-def log_lead(name: str, source_post_id: str, company: str | None = None):
-    requests.post(f"{NOTION_API}/pages", json={
-        "parent": {"database_id": NOTION_LEADS_DB_ID},
-        "properties": {
-            "Name": {"title": [{"text": {"content": name}}]},
-            "Source": {"rich_text": [{"text": {"content": source_post_id}}]},
-            "Status": {"select": {"name": "New"}},
-            "Date": {"date": {"start": datetime.now().isoformat()}},
-        }
-    }, headers={"Authorization": f"Bearer {NOTION_API_KEY}",
-                "Notion-Version": "2022-06-28"})
+```typescript
+// src/business/consulting/notion-crm.ts
+import axios from 'axios';
+
+async function logLead(name: string, sourcePostId: string, company?: string) {
+  await axios.post('https://api.notion.com/v1/pages', {
+    parent: { database_id: process.env.NOTION_LEADS_DB_ID },
+    properties: {
+      Name:   { title: [{ text: { content: name } }] },
+      Source: { rich_text: [{ text: { content: sourcePostId } }] },
+      Company:{ rich_text: [{ text: { content: company ?? '' } }] },
+      Status: { select: { name: 'New' } },
+      Date:   { date: { start: new Date().toISOString() } },
+    },
+  }, {
+    headers: {
+      Authorization: `Bearer ${process.env.NOTION_API_KEY}`,
+      'Notion-Version': '2022-06-28',
+    },
+  });
+}
 ```
 
 ---
@@ -751,26 +867,29 @@ Performance recording / studio session
   → [venue_outreach] personalized email to venue booking managers
 ```
 
-**Note on crop mode:** Current clip extractor is face-center. For guitar performance content, a custom `upper_body` crop mode is needed that centers between face position and wrist keypoints (available from existing `PoseEstimator`). This is a ~50-line change to `crop_calculator.py`.
+**Note on crop mode:** Current clip extractor is face-center. For guitar performance content, a custom `upper_body` crop mode is needed that centers between face position and wrist keypoints (available from existing `PoseEstimator`). This is a ~50-line change to `tools/clip_extractor/crop/crop_calculator.py`.
 
 **Venue outreach:**
-```python
-class VenueTarget(BaseModel):
-    venue_name: str
-    venue_type: str           # "bar" | "theater" | "festival" | "restaurant"
-    city: str
-    typical_acts: list[str]   # Scraped from Instagram
-    booking_contact: str | None
-    booking_email: str | None
+```typescript
+// src/business/music/venue-outreach.ts
+interface VenueTarget {
+  venueName: string;
+  venueType: 'bar' | 'theater' | 'festival' | 'restaurant';
+  city: string;
+  typicalActs: string[];      // Scraped from Instagram
+  bookingContact?: string;
+  bookingEmail?: string;
+}
 
-class ShowPackage(BaseModel):
-    epk_pdf_path: str
-    pitch_email: str
-    follow_up_email: str
-    social_proof_links: list[str]
+const ShowPackageSchema = z.object({
+  epkPdfPath: z.string(),
+  pitchEmail: z.string(),
+  followUpEmail: z.string(),
+  socialProofLinks: z.array(z.string()),
+});
 ```
 
-Data source for venue targets: Google Places API (Places API) filtered by category + city.
+Data source for venue targets: Google Places API filtered by category + city (Node.js `@googlemaps/google-maps-services-js`).
 
 ---
 
@@ -847,9 +966,9 @@ All DB queries are tenant-scoped. Render artifacts: `s3://{bucket}/{tenant_id}/o
 
 | Days | Task | Key Libraries |
 |------|------|--------------|
-| 1-2 | Data layer: SQLModel + Alembic + SQLite | `sqlmodel`, `alembic`, `aiosqlite` |
-| 3-4 | Job queue: ARQ + Redis + file watcher | `arq`, `redis`, `watchdog` |
-| 5-6 | Claude API integration: port clip-selection + copywriter skills to typed Python functions | `anthropic`, `pydantic` |
+| 1-2 | Data layer: Prisma schema + SQLite | `prisma`, `@prisma/client` |
+| 3-4 | Job queue: BullMQ + Redis + chokidar file watcher | `bullmq`, `ioredis`, `chokidar` |
+| 5-6 | Claude API integration: port clip-selection + copywriter skills to typed TS functions | `@anthropic-ai/sdk`, `zod` |
 | 7 | Integration test: drop a video → watch pipeline run end-to-end | — |
 
 **Day 7 success criteria:** Drop a 30-minute video in `input/`. Clips emerge in `output/clips/` with scores + captions — no manual commands.
@@ -862,10 +981,10 @@ All DB queries are tenant-scoped. Render artifacts: `s3://{bucket}/{tenant_id}/o
 
 | Days | Task | Key Libraries |
 |------|------|--------------|
-| 8-9 | Deterministic signal stack (density, patterns, VADER sentiment) | `vaderSentiment`, `spacy` |
-| 10-11 | Trend monitor (Perplexity API, 12h Redis cache) | `httpx`, `diskcache` |
-| 12-13 | Content Strategy Agent (analytics → posting schedule JSON) | `anthropic` |
-| 14 | Growth Agent + platform-specific hashtag system | `httpx` |
+| 8-9 | Deterministic signal stack (density, patterns, sentiment) | Built-in regex, no deps |
+| 10-11 | Trend monitor (Perplexity API, 12h Redis cache) | `axios`, `ioredis` |
+| 12-13 | Content Strategy Agent (analytics → posting schedule JSON) | `@anthropic-ai/sdk`, `zod` |
+| 14 | Growth Agent + platform-specific hashtag system | `axios` |
 
 ---
 
@@ -875,10 +994,10 @@ All DB queries are tenant-scoped. Render artifacts: `s3://{bucket}/{tenant_id}/o
 
 | Days | Task | Key Libraries |
 |------|------|--------------|
-| 15-16 | Distribution layer: Late API client with retry + webhook receiver | `tenacity`, `fastapi` |
-| 17-18 | Analytics feedback loop: daily cron pulls post performance → re-weights scorer | `arq` cron |
-| 19-20 | FastAPI server: `/ingest`, `/jobs`, `/clips/pending`, `/clips/{id}/approve` | `fastapi`, `uvicorn` |
-| 21 | CLI approval interface: `python -m ix approve` | `rich`, `typer` |
+| 15-16 | Distribution layer: Late API client with retry + Fastify webhook receiver | `axios`, `fastify` |
+| 17-18 | Analytics feedback loop: daily BullMQ cron pulls post performance → re-weights scorer | BullMQ cron |
+| 19-20 | Fastify server: `/ingest`, `/jobs`, `/clips/pending`, `/clips/:id/approve` | `fastify`, `@fastify/jwt` |
+| 21 | CLI approval interface: `npx ts-node src/cli/approve.ts` | `inquirer`, `chalk` |
 
 ---
 
@@ -888,12 +1007,12 @@ All DB queries are tenant-scoped. Render artifacts: `s3://{bucket}/{tenant_id}/o
 
 | Days | Task | Key Libraries |
 |------|------|--------------|
-| 22-23 | Consulting pipeline: CaseStudyGenerator + LeadMagnetGenerator + Notion CRM | `notion-client` |
-| 24-25 | Music outreach: Google Places → venue DB + VenueOutreachAgent | `googlemaps` |
-| 26-27 | SaaS foundation: multi-tenant schema + API key auth + Stripe | `python-jose`, `stripe` |
+| 22-23 | Consulting pipeline: CaseStudyGenerator + LeadMagnetGenerator + Notion CRM | `axios` (Notion API) |
+| 24-25 | Music outreach: Google Places → venue DB + VenueOutreachAgent | `@googlemaps/google-maps-services-js` |
+| 26-27 | SaaS foundation: multi-tenant Prisma schema + API key auth + Stripe | `@fastify/jwt`, `stripe` |
 | 28-30 | Dashboard v0: Next.js + Clerk auth + job status + clip review | Next.js, Clerk |
 
-**Deploy targets:** Railway (Python API + workers) + Vercel (Next.js dashboard)
+**Deploy targets:** Railway (Node.js API + BullMQ workers + Redis) + Vercel (Next.js dashboard)
 
 ---
 
@@ -912,14 +1031,16 @@ All DB queries are tenant-scoped. Render artifacts: `s3://{bucket}/{tenant_id}/o
 
 ### 2. Vector DB for content deduplication
 
-```python
-import chromadb
+```typescript
+// Use chromadb JS client or call embeddings + store in Prisma + pgvector (prod)
+// On new clip: check cosine similarity against last 90 days of posts
+// Threshold > 0.92 → flag as near-duplicate before publishing
 
-# On new clip: check cosine similarity against last 90 days of posts
-# Threshold > 0.92 → flag as near-duplicate before publishing
+import { ChromaClient } from 'chromadb';
+// or for prod: store embeddings as Float32Array in Postgres with pgvector
 ```
 
-Model: `text-embedding-3-small` (1536 dims, $0.00002/1K tokens)
+Model: `text-embedding-3-small` via `@anthropic-ai/sdk` or OpenAI SDK (1536 dims, $0.00002/1K tokens)
 
 ### 3. Remotion render at scale
 
@@ -930,7 +1051,7 @@ Model: `text-embedding-3-small` (1536 dims, $0.00002/1K tokens)
 
 - **Weeks 1-8:** SQLite (zero ops, sufficient for single tenant)
 - **Week 9+ with clients:** Postgres on Railway ($5/mo)
-- SQLModel works with both — no ORM change needed
+- Prisma works with both — just change `provider` in `schema.prisma`, run `prisma migrate deploy`
 
 ### 5. Music content crop mode
 
