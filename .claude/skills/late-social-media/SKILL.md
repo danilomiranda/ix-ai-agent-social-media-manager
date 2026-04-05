@@ -22,8 +22,7 @@ $ZERNIO_API_KEY
 ### Connected Accounts
 | Platform | Username | Account ID |
 |----------|----------|------------|
-| YouTube | enriquemarq-0 | 6978050f77637c5c857c82e9 |
-| LinkedIn | Enrique Marq | 6978052b77637c5c857c82ea |
+| YouTube | dankassio | 69d03eddbf4d9161df538bd8 |
 
 ---
 

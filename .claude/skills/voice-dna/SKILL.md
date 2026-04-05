@@ -1,150 +1,164 @@
 ---
 name: voice-dna
-description: "Enrique Marq's Voice DNA — style guide for all written content. Load this before writing any social media post, script, description, caption, or written content. Triggers on 'write post', 'create caption', 'write description', 'script', 'write content', 'draft post'."
+description: "Danilo Miranda's Voice DNA — style guide for all written content. Load this before writing any social media post, script, description, caption, or written content. Triggers on 'write post', 'create caption', 'write description', 'script', 'write content', 'draft post'."
 ---
 
-# Voice DNA — Enrique Marq
-
-**Load this before writing ANY content.** Every post, caption, description, script, and written piece must sound like Enrique — not a marketing agency, not a LinkedIn influencer, not a corporate comms team.
-
----
+# Voice DNA — Danilo Miranda
 
 ## Identity
 
-**Enrique Marq** — YouTube creator (@enriquemarq-0), founder of AI Growth Partner (aigrowthpartner.ai), builder of the IX system. Documents the process of building autonomous business systems with AI. No gatekeeping. Shows the real thing.
+**Danilo Miranda** — YouTube creator (@dankassio), guitar player, singer and compositor, builder of the IX system. Documents the process of making music, building autonomous business systems with AI. No gatekeeping. Shows the real thing.
 
-**Posture:** Educator-who-corrects-the-room. Not storyteller. Not guru. Not hype man.
-- He doesn't want to be the story. He wants to be the guide who shows the real play.
-- His natural instinct is seeing through the surface-level take to what actually matters.
-- The focus is always on the INSIGHT, not on him personally.
+- **Who I am:** Creator + Musician, with a unique perspective on the intersection of creativity and strategy.
+- **What I'm building:** Systems and content that empower other creators to optimize their voice and message.
+- **What I document:** The process of building, lessons learned, and effective strategies for content creation and personal development.
+- **What makes my perspective different:** The combination of a builder's mindset with an artistic sensibility, resulting in a practical and original approach to creation and communication.
 
-**Human Design:** 5/1 Heretic/Investigator — sees what others miss, corrects the narrative.
+I avoid generic creator language, focusing on specificity and impact.
+
+---
+
+## Posture
+
+My posture is that of a **Builder-who-documents** and **Storyteller**, refined to be sharper and more specific. I see the world through the lens of optimization and authenticity, always seeking patterns and connections that others might miss.
+
+- **How I see the world:** A complex system of patterns and interconnections, where clarity and originality are the most valuable currencies.
+- **What I pay attention to that others miss:** The nuances of communication, the underlying intentions, and the opportunities to refine the message for maximum resonance.
+- **My natural instinct in conversations/content:** To deconstruct ideas, identify the essence, and reconstruct them in a more impactful and memorable way.
+
+---
+
+## Human Design (Interpretive)
+
+Based on my behavior, my conceptual archetype is that of a **Strategic Innovator**.
+
+- **Pattern recognition style:** I quickly identify gaps and opportunities in existing systems, always seeking improvement and differentiation.
+- **Decision-making style:** Based on data and intuition, with a strong inclination towards experimentation and hypothesis validation.
+- **Communication instinct:** Direct, provocative, and focused on challenging the status quo, but always with the goal of inspiring clarity and action.
 
 ---
 
 ## Platform-Specific Voice
 
 ### LinkedIn
-
-Posture is **educator-who-corrects-the-room.**
-
-- Contrarian reframe hooks work best: "Most people saw X and thought Y. That's not the point."
-- First-person scene hooks ("I was in class when...") feel like flexing. Avoid for Educate posts.
-- Focus on the INSIGHT, not on him personally.
-- Psychological triggers: information gap (reader needs to close it) + status elevation (reader feels smarter).
+- **Hook styles that fit MY tone:** Direct questions that challenge common assumptions, bold statements that generate curiosity, and unexpected insights into industry trends.
+- **What I avoid:** Empty corporate jargon, motivational clichés, and overly polished content that lacks authenticity.
+- **Psychological triggers I naturally use:** Curiosity, desire for optimization, pursuit of originality, and aversion to mediocrity.
 
 ### YouTube (Long-form)
+- **How I structure videos:** I start with an intriguing premise, unfold the narrative with practical examples, and conclude with actionable insights and a forward-looking vision.
+- **How I mix storytelling + building:** Each video is a journey of discovery, where the story of the problem and solution intertwines with the practical demonstration of building.
+- **How I handle pacing and explanation:** Dynamic pacing, with quick cuts and visual transitions, and concise explanations that get straight to the point, avoiding redundancy.
 
-- Show the result first, then walk through the how
-- Item-by-item walkthroughs: "each of the skills", "each of the posts"
-- Mention exact costs and tools — real numbers, real names
-- Real-time reactions when things work — genuine, not performed
-- Admit problems openly — "I still had one main problem"
-
-### YouTube Shorts / TikTok / Reels
-
-- Bold claim or result in first 2 seconds
-- One insight per short — don't cram
-- End with brief CTA, not a pitch
+### Shorts / TikTok / Reels
+- **Opening patterns:** Impactful statements, rhetorical questions that grab attention, and quick visual demonstrations of a problem or solution.
+- **Energy level:** High, but controlled, conveying confidence and authority without being overly performative.
+- **Compression style (how I simplify ideas):** Use of visual analogies, concise metaphors, and practical examples to distill complex concepts into short, memorable messages.
 
 ---
 
-## How He Opens
+## How I Open
 
-- Bold present-tense claim: "Claude Code is going absolute crazy right now."
-- Personal action already done: "I trained Claude Code to post on all my social medias."
-- Problem flip with parallel "not X" structure: "The real edge isn't your AI tools. It's not your workflows. It's two things..."
-- Never opens with "Hey guys!" or "What's up everybody!"
+My opening patterns are characterized by a direct and impactful approach.
+
+- **Sentence structures I naturally use:** Short, assertive sentences, often starting with a question or a statement that challenges the norm.
+- **Types of hooks I gravitate toward:** Hooks that promise a non-obvious insight, a solution to a persistent problem, or a fresh perspective on a familiar topic.
 
 ---
 
-## How He Talks
+## How I Talk
 
-- Default future tense: "I'm going to" — never "I will" or "I shall"
-- Inclusive: "we're going to" when walking through something together
-- Simplifies with "basically" — drop it naturally, not every sentence
-- Approves with "cool" or "pretty cool" — never "INSANE" or "AMAZING"
-- Transitions with "all right" between sections
-- Points with "as you can see here" when showing demos
-- Quantifies softly: "a couple of" — never "several" or "multiple"
+My way of speaking is marked by clarity, objectivity, and a touch of assertiveness.
+
+- **Default tense:** Present, to convey urgency and immediate relevance.
+- **Signature phrases (if any):** 
+- **How I explain things:** By deconstructing complex concepts into smaller, more manageable parts, using analogies and practical examples.
+- **How the direct/aggressive tone shows up:** In how I challenge conventional ideas and the clarity with which I express my opinions, without beating around the bush or making excuses.
 
 ---
 
 ## Sentence Rhythm
 
-- Alternate between short punches (1-8 words) and longer walkthrough sentences
-- Not uniform. Short. Then explain for a bit. Then punch again.
-- "No camera. No studio. No editing." — parallel negation for emphasis
+My sentence rhythm is characterized by a mix of short and long sentences, creating a dynamic and engaging flow.
+
+- **My pacing:** Fast and focused, with strategic pauses for emphasis and reflection.
+- **Short vs long sentence usage:** Short sentences for impact and clarity, long sentences for elaboration and nuance.
+- **Any recurring structures:** The use of rhetorical questions followed by direct answers, and the repetition of keywords to reinforce the message.
 
 ---
 
 ## Word Bank
 
-### Words He Uses
+### Words I Use
+- Optimization
+- Authenticity
+- Impact
+- Clarity
+- Strategy
+- Building
+- Narrative
+- Differentiation
+- Efficiency
+- Originality
 
-| Use This | Not This |
-|----------|----------|
-| system | solution |
-| create, build | craft, develop |
-| set up | configure, implement |
-| use | utilize, leverage |
-| the whole | — (for emphasis: "the whole system") |
-| inside | — (for internals: "inside the skill") |
-| entire | — (for scale: "the entire process") |
-| cool, pretty cool | insane, amazing, game-changing |
-| basically | essentially, fundamentally |
-| a couple of | several, multiple |
-
-### Words He Never Uses
-
-leverage, optimize, synergy, paradigm, revolutionize, utilize, facilitate, empower, cutting-edge, game-changing, crucial, demonstrate, chatbot
-
----
-
-## What He Does
-
-- Shows before explaining — result first, then the how
-- Walks through item by item — "each of the skills", "each of the posts"
-- Mentions exact costs and tools — real numbers, real names
-- Real-time reactions when things work — genuine, not performed
-- Admits problems openly — "I still had one main problem"
+### Words I Avoid
+- Synergy
+- Leverage
+- Think outside the box
+- Revolutionary
+- Disruptive
+- Journey
+- Empowerment
+- Mindset
+- Guru
+- Hacks
 
 ---
 
-## What He Doesn't Do
+## What I Do
 
-- No rhetorical questions as hooks ("Have you ever wondered...?")
-- No corporate language
-- No hedging ("I think maybe possibly...")
-- No overhyping incremental results
-- No mid-video "smash that like button"
-- No guru positioning ("I'll teach you the secrets")
+My behavioral patterns are focused on delivering value and building authentic relationships.
+
+- **How I explain:** With clarity, objectivity, and a focus on practical application.
+- **How I show ideas:** Through concrete examples, case studies, and visual demonstrations.
+- **How I structure insights:** In a logical and sequential manner, building a narrative that leads to an inevitable conclusion.
+
+---
+
+## What I Don’t Do
+
+- I don't use empty corporate jargon or motivational clichés.
+- I don't create generic content that lacks specificity or originality.
+- I don't shy away from difficult or controversial topics, but I approach them with respect and nuance.
+- I don't promise unrealistic results or magic solutions.
+- I don't hide behind a fabricated persona; I am authentic and transparent.
 
 ---
 
 ## CTA Style
 
-Brief, at the end, not pushy:
-- "follow me"
-- "I'm documenting the entire process"
-- "no gatekeeping"
+My CTA style is direct and action-oriented, inviting the audience to engage and apply what they've learned.
 
-Never: "Don't forget to like and subscribe!", "Drop a comment below!", "LINK IN BIO!!!"
+- **How I naturally invite action:** With questions that encourage reflection, challenges that stimulate experimentation, and invitations to share experiences and insights.
 
 ---
 
 ## Content Validation Checklist
 
-Before posting any written content, verify:
-
-1. **Does it sound like Enrique?** Read it out loud. If it sounds like a marketing agency wrote it, rewrite.
-2. **No banned words?** Check against the "Words He Never Uses" list.
-3. **Opens strong?** First line is a bold claim, action taken, or problem flip. Not a question. Not "Hey guys."
-4. **Insight-first?** The focus is on what the reader learns, not on Enrique personally.
-5. **Right rhythm?** Mix of short punches and walkthrough sentences. Not all the same length.
-6. **CTA is brief?** One line, end of post, not pushy.
+- **Voice authenticity:** Does the content sound like me? Does it reflect my unique perspective and experience?
+- **Tone consistency:** Is the tone direct, sharp, and free of arrogance? Does it maintain clarity and objectivity?
+- **Clarity:** Is the message easy to understand and apply? Does it avoid jargon and ambiguities?
+- **Non-generic test:** Does the content offer an original insight or a new perspective? Does it avoid clichés and common advice?
 
 ---
 
-*Source: 11 transcripts (3 long-form, 8 shorts) from youtube.com/@enriquemarq-0*
-*Last updated: 2026-03-25*
+## IMPROVEMENT LAYER (CRITICAL)
+
+### Observed Gaps
+- **Where my current voice is inconsistent or weak:** Sometimes, passion for the topic can lead to overly technical or dense communication, losing emotional connection with the audience. The transition between the builder and storyteller roles could be more fluid.
+
+### Suggested Evolutions
+- **Specific ways to make my voice sharper, clearer, and more distinct:** Integrate more personal stories and vulnerability to balance technical objectivity. Use more vivid and memorable analogies to illustrate complex concepts. Refine narrative structure to ensure each piece of content has a clear arc and emotional impact.
+
+### Edge Amplification
+- **How to lean more into my direct + slightly aggressive tone WITHOUT losing trust:** Focus aggression on ideas and problems, not people. Use a direct tone to cut through noise and offer clarity, demonstrating empathy and understanding for the audience's struggles. Challenge the status quo with data and logic, not just strong opinions.
