@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/ix-logo.png" alt="INFINITX AI" width="120" />
+  <img src="assets/ix-logo.png" alt="IX AI" width="120" />
 </p>
 
 <h1 align="center">IX AI Agent Social Media Manager</h1>
@@ -52,22 +52,31 @@
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/Trejon-888/ix-ai-agent-social-media-manager.git
+git clone https://github.com/danilomiranda/ix-ai-agent-social-media-manager.git
 cd ix-ai-agent-social-media-manager
 ```
 
-### 2. Install dependencies
+### 2. Use Node 22
 
 ```bash
-# Remotion (video engine)
+nvm use 22
+```
+
+### 3. Install dependencies
+
+```bash
+# Node.js (Remotion + V2 pipeline)
 npm install
 
-# Clip Extractor (Python face-tracking pipeline)
-# Requires Python 3.10+ and pip
+# Prisma DB setup
+npm run db:migrate
+
+# Python (clip extractor + transcription)
+# Requires Python 3.11+
 pip install -r tools/clip_extractor/requirements.txt
 ```
 
-The clip extractor requires these Python packages (all listed in `requirements.txt`):
+The clip extractor requires these Python packages:
 - **mediapipe** -- Face detection (BlazeFace)
 - **opencv-contrib-python** -- Video frame processing (cv2)
 - **numpy** -- Array operations
@@ -75,27 +84,72 @@ The clip extractor requires these Python packages (all listed in `requirements.t
 - **pyyaml** -- Config parsing
 - **rapidfuzz** -- Fuzzy text matching
 
-> **Troubleshooting:** If clip extraction produces a static center crop instead of face-tracking, verify that `opencv-contrib-python` installed correctly: `python -c "import cv2; print(cv2.__version__)"`. This is the most common setup issue.
+> **Troubleshooting:** If clip extraction produces a static center crop instead of face-tracking, verify that `opencv-contrib-python` installed correctly: `python -c "import cv2; print(cv2.__version__)"`.
 
-### 3. Set API keys
+### 4. Set API keys
 
 Create a `.env` file in the project root:
 
 ```bash
+# Social media publishing
 ZERNIO_API_KEY=your-zernio-api-key        # Required: zernio.com (free to start)
 ZERNIO_PROFILE_ID=your-profile-id         # Required: from your Zernio dashboard
-KIE_API_KEY=your-kie-api-key              # Optional: kie.ai (for thumbnails/carousels)
+KIE_API_KEY=your-kie-api-key              # Optional: kie.ai (thumbnails/carousels)
+
+# V2 pipeline
+ANTHROPIC_API_KEY=your-anthropic-api-key  # Required: console.anthropic.com
+DATABASE_URL=file:./dev.db
+REDIS_URL=redis://localhost:6379
+PORT=3001
 ```
 
-### 4. Open in Claude Code
+### 5. Start Redis (for V2 pipeline)
+
+```bash
+docker compose up -d
+```
+
+### 6. Open in Claude Code
 
 ```bash
 claude
 ```
 
-That's it. Claude Code reads the skills automatically. Say "post to LinkedIn" or "create a thumbnail" and it works.
+Claude Code reads the skills automatically. Say "post to LinkedIn" or "create a thumbnail" and it works.
 
-### Session Commands
+---
+
+## V2 Pipeline (Autonomous Mode)
+
+Run the pipeline headlessly without typing commands:
+
+```bash
+# Terminal 1 — background workers
+npm run dev:worker
+
+# Terminal 2 — API server + file watcher
+npm run dev:api
+```
+
+Drop a `.mp4` into `input/` and the pipeline starts automatically:
+```
+input/your-video.mp4
+  → transcription (WhisperX)
+  → clip selection (Claude API)
+  → face-track reframe (Python CV)
+  → Remotion edit
+  → publish (Late API)
+```
+
+API endpoints:
+- `POST /ingest` — trigger pipeline for a video path or URL
+- `GET /jobs/:id` — check job status
+- `GET /clips/pending` — review scored clips awaiting approval
+- `POST /clips/:id/approve` — approve and trigger edit + publish
+
+---
+
+## Session Commands
 
 Once you're in Claude Code:
 - **`/continue`** -- Resume a session. Loads context, checks system readiness, reviews recent work, suggests what to do next.
@@ -124,27 +178,14 @@ See `examples/` for more detailed walkthroughs.
 ## Requirements
 
 - **Claude Code** (or any Claude-powered coding agent)
-- **Node.js 18+** (for Remotion video engine)
-- **Python 3.10+** with pip (for clip extractor -- face detection, tracking, reframe)
-- **FFmpeg** (for video processing -- [download](https://ffmpeg.org/download.html) or `winget install Gyan.FFmpeg`)
+- **Node.js 22+** (for Remotion + V2 pipeline)
+- **Python 3.11+** with pip (for clip extractor and transcription)
+- **FFmpeg** (for video processing -- [download](https://ffmpeg.org/download.html) or `brew install ffmpeg`)
+- **Docker** (for Redis — required for V2 autonomous pipeline)
 - **Zernio API key** ([zernio.com](https://zernio.com) -- free to start) for social media posting
+- **Anthropic API key** ([console.anthropic.com](https://console.anthropic.com)) for AI agents
 - **KIE API key** ([kie.ai](https://kie.ai)) for AI image generation (optional)
 
 ---
 
-## IX Creator Community
-
-This repo is part of the **IX Creator Community** -- builders, product leaders, and creators working with autonomous intelligence to build businesses that run themselves.
-
-**Three pillars:**
-- **Autonomous Operations** -- Context management, self-operating systems, the intelligence running your business so you don't have to.
-- **Products + Partners** -- Real products built by real builders. If you want to sell, there's something ready. If you want to build, there's everything you need.
-- **Life Empowerment** -- Your business is an extension of you. We're here for the whole person, not just the tech stack.
-
-[Join the IX Creator Community on Discord](https://discord.gg/s5ygK4pQZG)
-
-Create more. Consume less.
-
----
-
-Built by [Enrique Marq](https://youtube.com/@enriquemarq-0) / [AI Growth Partner](https://aigrowthpartner.ai)
+Built by [Danilo Miranda](https://github.com/danilomiranda)
