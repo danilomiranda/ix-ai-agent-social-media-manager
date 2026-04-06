@@ -7,9 +7,9 @@
     "studio": "npx remotion studio remotion/index.ts",
     "render": "npx remotion render remotion/index.ts",
     "build": "tsc --noEmit",
-    "dev:api": "tsx watch src/api/server.ts",
-    "dev:worker": "tsx watch src/workers/index.ts",
-    "worker": "tsx src/workers/index.ts",
+    "dev:api": "tsx --env-file=.env watch src/api/server.ts",
+    "dev:worker": "tsx --env-file=.env watch src/workers/index.ts",
+    "worker": "tsx --env-file=.env src/workers/index.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio"
