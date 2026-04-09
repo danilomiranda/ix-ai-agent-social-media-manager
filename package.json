@@ -12,7 +12,10 @@
     "worker": "tsx src/workers/index.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "test": "nvm exec 18 npx vitest run",
+    "test:watch": "nvm exec 18 npx vitest",
+    "test:coverage": "nvm exec 18 npx vitest run --coverage"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.40.0",
@@ -41,8 +44,10 @@
   "devDependencies": {
     "@types/node": "^22.14.1",
     "@types/react": "^18.3.23",
+    "@vitest/coverage-v8": "^1.6.1",
     "inquirer": "^12.5.2",
     "prisma": "^6.6.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^1.6.1"
   }
 }
