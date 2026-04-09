@@ -1,8 +1,18 @@
 """
-Transcriber CLI — wraps WhisperX to produce word-level SRT + JSON.
+Transcriber CLI — wraps openai-whisper to produce word-level SRT + JSON.
+
+Downloads models from OpenAI CDN (~150MB for 'base', ~1.5GB for 'large-v3').
+No HuggingFace account required.
 
 Usage:
   python -m transcriber --video <path> --output <dir> [--language <lang>] [--model <size>]
+
+Model sizes (tradeoff: speed vs accuracy on CPU):
+  tiny   ~75MB   fastest, lower accuracy
+  base   ~150MB  good balance for testing
+  small  ~500MB  better accuracy
+  medium ~1.5GB  high accuracy
+  large-v3 ~3GB  best accuracy (slow on CPU)
 
 Outputs:
   <output_dir>/transcript.srt         — standard SRT for caption rendering
@@ -64,32 +74,33 @@ def words_to_srt(word_segments: list, max_chars: int = 60) -> str:
     return "\n".join(entries)
 
 
-def transcribe(video_path: str, output_dir: str, language: str = "en", model_size: str = "large-v3"):
-    """Run WhisperX transcription and write outputs."""
+def transcribe(video_path: str, output_dir: str, language: str = "en", model_size: str = "base"):
+    """Run openai-whisper transcription and write outputs."""
     try:
-        import whisperx
-        import torch
+        import whisper
     except ImportError:
-        print("ERROR: whisperx not installed. Run: pip install whisperx", file=sys.stderr)
+        print("ERROR: openai-whisper not installed. Run: pip install openai-whisper", file=sys.stderr)
         sys.exit(1)
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    compute_type = "float16" if device == "cuda" else "int8"
-
-    print(f"[transcriber] Device: {device}, model: {model_size}")
+    print(f"[transcriber] Model: {model_size} (downloads from OpenAI CDN if not cached)")
     print(f"[transcriber] Transcribing: {video_path}")
 
-    # Load model and transcribe
-    model = whisperx.load_model(model_size, device, compute_type=compute_type)
-    result = model.transcribe(video_path, batch_size=16, language=language)
+    model = whisper.load_model(model_size)
+    result = model.transcribe(video_path, language=language, word_timestamps=True, verbose=False)
 
-    # Align to get word-level timestamps
-    align_model, metadata = whisperx.load_align_model(language_code=language, device=device)
-    result = whisperx.align(result["segments"], align_model, metadata, video_path, device)
+    # Flatten word-level segments into a flat list matching the existing schema:
+    # [{ "word": str, "start": float, "end": float }, ...]
+    word_segments = []
+    for segment in result.get("segments", []):
+        for w in segment.get("words", []):
+            word_segments.append({
+                "word": w["word"].strip(),
+                "start": round(w["start"], 3),
+                "end": round(w["end"], 3),
+            })
 
-    word_segments = result.get("word_segments", [])
     print(f"[transcriber] Got {len(word_segments)} word segments")
 
     # Write word-level JSON
@@ -109,11 +120,11 @@ def transcribe(video_path: str, output_dir: str, language: str = "en", model_siz
 
 
 def main():
-    parser = argparse.ArgumentParser(description="WhisperX transcriber CLI")
+    parser = argparse.ArgumentParser(description="openai-whisper transcriber CLI")
     parser.add_argument("--video", required=True, help="Path to input video file")
     parser.add_argument("--output", required=True, help="Output directory for transcript files")
     parser.add_argument("--language", default="en", help="Language code (default: en)")
-    parser.add_argument("--model", default="large-v3", help="WhisperX model size (default: large-v3)")
+    parser.add_argument("--model", default="base", help="Whisper model size: tiny/base/small/medium/large-v3 (default: base)")
     args = parser.parse_args()
 
     if not os.path.exists(args.video):

@@ -3,6 +3,25 @@ import path from 'path';
 import { prisma } from '../../db/client.js';
 import { queues } from '../../queue/queues.js';
 
+function validateIngestPaths(filePath?: string, url?: string): string | null {
+  if (filePath !== undefined) {
+    if (!path.isAbsolute(filePath)) {
+      return 'filePath must be an absolute path';
+    }
+    const projectRoot = path.resolve('.');
+    const resolved = path.resolve(filePath);
+    if (!resolved.startsWith(projectRoot + path.sep) && resolved !== projectRoot) {
+      return 'filePath must be within the project directory';
+    }
+  }
+  if (url !== undefined) {
+    if (!url.startsWith('https://')) {
+      return 'url must start with https://';
+    }
+  }
+  return null;
+}
+
 export async function ingestRoutes(app: FastifyInstance) {
   // POST /ingest — trigger pipeline for a video file path or URL
   app.post('/ingest', async (request, reply) => {
@@ -15,6 +34,11 @@ export async function ingestRoutes(app: FastifyInstance) {
 
     if (!body.filePath && !body.url) {
       return reply.status(400).send({ error: 'filePath or url is required' });
+    }
+
+    const pathError = validateIngestPaths(body.filePath, body.url);
+    if (pathError) {
+      return reply.status(400).send({ error: pathError });
     }
 
     const fileName = body.title ?? path.basename(body.filePath ?? body.url ?? 'unknown');

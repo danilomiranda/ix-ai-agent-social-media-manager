@@ -3,13 +3,22 @@ import { spawn } from 'child_process';
 import path from 'path';
 import { connection, queues } from '../queue/queues.js';
 import { prisma } from '../db/client.js';
+import { assertSafeOutputDir } from './utils.js';
 
 function spawnAsync(cmd: string, args: string[], cwd: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(cmd, args, { cwd, stdio: 'inherit' });
+    const proc = spawn(cmd, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+    const outLines: string[] = [];
+    const errLines: string[] = [];
+    proc.stdout.on('data', (d: Buffer) => { const s = d.toString(); process.stdout.write(s); outLines.push(s); });
+    proc.stderr.on('data', (d: Buffer) => { const s = d.toString(); process.stderr.write(s); errLines.push(s); });
     proc.on('close', (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`Process exited with code ${code}`));
+      if (code === 0) {
+        resolve();
+      } else {
+        const detail = errLines.join('').trim() || outLines.join('').trim() || `exit code ${code}`;
+        reject(new Error(`Process exited with code ${code}: ${detail.slice(0, 500)}`));
+      }
     });
     proc.on('error', reject);
   });
@@ -21,6 +30,7 @@ export const transcribeWorker = new Worker(
     const { sourceId, sourcePath, outputDir } = job.data;
     const root = path.resolve('.');
 
+    assertSafeOutputDir(outputDir);
     console.log(`[transcribe] Starting job ${job.id} for ${sourcePath}`);
 
     await prisma.job.update({

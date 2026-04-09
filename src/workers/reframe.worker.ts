@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { connection, queues } from '../queue/queues.js';
 import { prisma } from '../db/client.js';
+import { assertSafeOutputDir } from './utils.js';
 
 function spawnAsync(cmd: string, args: string[], cwd: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -19,10 +20,23 @@ function spawnAsync(cmd: string, args: string[], cwd: string): Promise<void> {
 export const reframeWorker = new Worker(
   'reframe',
   async (job) => {
-    const { clipId, sourcePath, clipDefinitionsPath, outputDir } = job.data;
+    const { dbJobId, clipId, sourcePath, clipDefinitionsPath, outputDir } = job.data;
     const root = path.resolve('.');
 
+    assertSafeOutputDir(outputDir);
     console.log(`[reframe] Starting reframe for clip ${clipId}`);
+
+    // Look up clip to get sourceId for Job record
+    const clip = await prisma.clip.findUnique({ where: { id: clipId }, select: { sourceId: true } });
+    if (!clip) throw new Error(`Clip ${clipId} not found`);
+
+    // Update or create Job record at start
+    if (dbJobId) {
+      await prisma.job.update({
+        where: { id: dbJobId },
+        data: { status: 'running', startedAt: new Date() },
+      });
+    }
 
     await spawnAsync('python3', [
       '-m', 'clip_extractor', 'batch',
@@ -37,6 +51,17 @@ export const reframeWorker = new Worker(
       where: { id: clipId },
       data: { filePath: reframedPath },
     });
+
+    if (dbJobId) {
+      await prisma.job.update({
+        where: { id: dbJobId },
+        data: {
+          status: 'done',
+          completedAt: new Date(),
+          output: JSON.stringify({ reframedPath }),
+        },
+      });
+    }
 
     // Fan out to edit worker
     await queues.edit.add('edit-clip', {
@@ -53,6 +78,13 @@ export const reframeWorker = new Worker(
   }
 );
 
-reframeWorker.on('failed', (job, err) => {
+reframeWorker.on('failed', async (job, err) => {
   console.error(`[reframe] Job ${job?.id} failed:`, err.message);
+  const dbJobId = job?.data?.dbJobId;
+  if (dbJobId) {
+    await prisma.job.update({
+      where: { id: dbJobId },
+      data: { status: 'failed', error: err.message, completedAt: new Date() },
+    });
+  }
 });
