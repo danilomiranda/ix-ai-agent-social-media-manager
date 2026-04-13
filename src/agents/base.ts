@@ -23,8 +23,17 @@ export async function runAgent<T>(opts: {
     throw new Error(`Unexpected response type: ${block.type}`);
   }
 
-  // Extract JSON from the response (handle markdown code blocks)
-  const text = block.text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim();
+  // Extract JSON — handle markdown code blocks and leading prose
+  let text = block.text.trim();
+  const codeBlock = text.match(/```(?:json)?\s*\n([\s\S]*?)\n```/);
+  if (codeBlock) {
+    text = codeBlock[1].trim();
+  } else {
+    // Fall back: grab from first { to last }
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start !== -1 && end !== -1) text = text.slice(start, end + 1);
+  }
 
   return opts.schema.parse(JSON.parse(text));
 }

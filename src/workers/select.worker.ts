@@ -118,6 +118,7 @@ export const selectWorker = new Worker(
         sourcePath,
         clipDefinitionsPath: clipDefsPath,
         outputDir: clipOutputDir,
+        wordsJsonPath,
       });
     }
 

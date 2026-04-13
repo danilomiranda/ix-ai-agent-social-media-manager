@@ -2,10 +2,18 @@
 node_modules/
 __pycache__/
 *.pyc
+*.pyo
 output/
 public/clips/
+public/pipeline-clips/
 prisma/dev.db
 prisma/dev.db-journal
 dist/
 input/*
 !input/.gitkeep
+.DS_Store
+.python-version
+
+# Pipeline-generated Remotion compositions (runtime artifacts)
+remotion/compositions/Clip[a-z]*.tsx
+remotion/data/clip[a-z]*-words.ts

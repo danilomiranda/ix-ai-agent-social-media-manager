@@ -20,7 +20,7 @@ function spawnAsync(cmd: string, args: string[], cwd: string): Promise<void> {
 export const reframeWorker = new Worker(
   'reframe',
   async (job) => {
-    const { dbJobId, clipId, sourcePath, clipDefinitionsPath, outputDir } = job.data;
+    const { dbJobId, clipId, sourcePath, clipDefinitionsPath, outputDir, wordsJsonPath } = job.data;
     const root = path.resolve('.');
 
     assertSafeOutputDir(outputDir);
@@ -45,7 +45,20 @@ export const reframeWorker = new Worker(
       '--output', outputDir,
     ], path.join(root, 'tools'));
 
-    const reframedPath = path.join(outputDir, 'reframed-9x16.mp4');
+    // The extractor creates reframed-9x16.mp4 inside a per-clip subdirectory — find it
+    const findReframed = async (dir: string): Promise<string> => {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      for (const e of entries) {
+        const full = path.join(dir, e.name);
+        if (e.isFile() && e.name === 'reframed-9x16.mp4') return full;
+        if (e.isDirectory()) {
+          const found = await findReframed(full).catch(() => '');
+          if (found) return found;
+        }
+      }
+      return '';
+    };
+    const reframedPath = await findReframed(outputDir) || path.join(outputDir, 'reframed-9x16.mp4');
 
     await prisma.clip.update({
       where: { id: clipId },
@@ -68,6 +81,7 @@ export const reframeWorker = new Worker(
       clipId,
       reframedPath,
       outputDir,
+      wordsJsonPath,
     });
 
     console.log(`[reframe] Done — enqueued edit for clip ${clipId}`);

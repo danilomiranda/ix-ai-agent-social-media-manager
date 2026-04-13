@@ -13,8 +13,9 @@
     "strictNullChecks": false,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "types": ["node"]
   },
-  "include": ["remotion/**/*"],
+  "include": ["remotion/**/*", "src/**/*"],
   "exclude": ["node_modules"]
 }

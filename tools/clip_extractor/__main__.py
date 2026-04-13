@@ -126,15 +126,16 @@ def cmd_batch(args: argparse.Namespace) -> None:
     results = []
     for i, clip in enumerate(clips):
         clip_id = clip.get("id", i + 1)
-        title = clip.get("title", f"clip-{clip_id:02d}")
+        clip_num = i + 1
+        title = clip.get("title", f"clip-{clip_num:02d}")
         start = clip["start"]
         end = clip["end"]
 
         print(f"\n{'='*60}")
-        print(f"Clip {clip_id}: {title} ({start:.1f}s - {end:.1f}s)")
+        print(f"Clip {clip_num}: {title} ({start:.1f}s - {end:.1f}s)")
         print(f"{'='*60}")
 
-        clip_dir = str(out_dir / f"clip-{clip_id:02d}-{title}")
+        clip_dir = str(out_dir / f"clip-{clip_num:02d}-{title}")
 
         result = reframe(
             video_path=args.video,

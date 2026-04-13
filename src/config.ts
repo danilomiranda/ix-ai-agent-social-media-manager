@@ -19,4 +19,4 @@ if (!parsed.success) {
   process.exit(1);
 }
 
-export const config = parsed.data;
+export const config = parsed.data!;

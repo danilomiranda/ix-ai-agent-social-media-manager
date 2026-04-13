@@ -50,6 +50,9 @@ import { TOTAL_DURATION_FRAMES as JENSEN_MANIFEST_DURATION } from "./data/jensen
 import { TOTAL_DURATION_FRAMES as JENSEN_INTELLIGENCE_DURATION } from "./data/jensen-intelligence-commodity-words";
 import { TOTAL_DURATION_FRAMES as JENSEN_SPEED_DURATION } from "./data/jensen-speed-of-light-words";
 
+import { Clipcmnw5nrx } from './compositions/Clipcmnw5nrx';
+import { Clipcmnwdlzx } from './compositions/Clipcmnwdlzx';
+import { Clipcmnwdlzw } from './compositions/Clipcmnwdlzw';
 import { VIDEO_FPS, RESOLUTIONS } from "./lib/config";
 
 export const RemotionRoot: React.FC = () => {
@@ -414,6 +417,37 @@ export const RemotionRoot: React.FC = () => {
         id="ToolCalling2Point0"
         component={ToolCalling2Point0}
         durationInFrames={900}
+        fps={VIDEO_FPS}
+        width={RESOLUTIONS.portrait.width}
+        height={RESOLUTIONS.portrait.height}
+      />
+
+
+
+
+
+      <Composition
+        id="Clipcmnw5nrx"
+        component={Clipcmnw5nrx}
+        durationInFrames={1826}
+        fps={VIDEO_FPS}
+        width={RESOLUTIONS.portrait.width}
+        height={RESOLUTIONS.portrait.height}
+      />
+
+      <Composition
+        id="Clipcmnwdlzx"
+        component={Clipcmnwdlzx}
+        durationInFrames={1828}
+        fps={VIDEO_FPS}
+        width={RESOLUTIONS.portrait.width}
+        height={RESOLUTIONS.portrait.height}
+      />
+
+      <Composition
+        id="Clipcmnwdlzw"
+        component={Clipcmnwdlzw}
+        durationInFrames={1819}
         fps={VIDEO_FPS}
         width={RESOLUTIONS.portrait.width}
         height={RESOLUTIONS.portrait.height}

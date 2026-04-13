@@ -22,7 +22,7 @@ function spawnAsync(cmd: string, args: string[], cwd: string): Promise<void> {
 export const editWorker = new Worker(
   'edit',
   async (job) => {
-    const { dbJobId, clipId, reframedPath, outputDir, platforms, caption } = job.data;
+    const { dbJobId, clipId, reframedPath, outputDir, wordsJsonPath, platforms, caption } = job.data;
     const root = path.resolve('.');
 
     assertSafeOutputDir(outputDir);
@@ -46,29 +46,42 @@ export const editWorker = new Worker(
     const compositionFile = path.resolve('remotion', 'compositions', `${compositionId}.tsx`);
     const wordsFile = path.resolve('remotion', 'data', `${compositionId.toLowerCase()}-words.ts`);
 
+    // Copy reframed video to public/pipeline-clips/<clipId>/reframed.mp4 (URL-safe, served by Remotion)
+    const publicClipDir = path.resolve('public', 'pipeline-clips', clipId);
+    const publicVideoPath = path.join(publicClipDir, 'reframed.mp4');
+    const staticFilePath = `pipeline-clips/${clipId}/reframed.mp4`; // path for staticFile()
+    await fs.mkdir(publicClipDir, { recursive: true });
+    await fs.copyFile(reframedPath, publicVideoPath);
+
     const alreadyExists = await fs.access(compositionFile).then(() => true).catch(() => false);
 
     if (!alreadyExists) {
-      // Read word-level transcript
-      const wordsPath = path.join(outputDir, 'transcript.words.json');
+      // Read word-level transcript (passed from transcribe → select → reframe → edit)
       let wordsJson: TranscriptWord[] = [];
-      try {
-        wordsJson = JSON.parse(await fs.readFile(wordsPath, 'utf-8'));
-      } catch {
-        console.warn(`[edit] transcript.words.json not found at ${wordsPath} — continuing with empty words`);
+      if (wordsJsonPath) {
+        try {
+          wordsJson = JSON.parse(await fs.readFile(wordsJsonPath, 'utf-8'));
+        } catch {
+          console.warn(`[edit] transcript.words.json not found at ${wordsJsonPath} — continuing with empty words`);
+        }
       }
 
-      const durationSec = clip.endSec != null && clip.startSec != null
-        ? clip.endSec - clip.startSec
-        : 60;
+      const startSec = clip.startSec ?? 0;
+      const endSec = clip.endSec ?? startSec + 60;
+      const durationSec = endSec - startSec;
+
+      // Filter words to clip time range and normalize timestamps to clip-relative seconds
+      const clipWords = wordsJson
+        .filter(w => w.start >= startSec && w.end <= endSec)
+        .map(w => ({ ...w, start: parseFloat((w.start - startSec).toFixed(3)), end: parseFloat((w.end - startSec).toFixed(3)) }));
 
       const editorOutput = await runVideoEditorAgent({
         compositionId,
         clipTitle: clip.title ?? compositionId,
         durationSec,
         transcriptExcerpt: clip.transcriptExcerpt ?? '',
-        wordsJson,
-        reframedVideoPath: path.relative(root, reframedPath),
+        wordsJson: clipWords,
+        reframedVideoPath: staticFilePath,
       });
 
       await fs.mkdir(path.resolve('remotion', 'compositions'), { recursive: true });
@@ -76,9 +89,31 @@ export const editWorker = new Worker(
       await fs.writeFile(compositionFile, editorOutput.tsxContent, 'utf-8');
       await fs.writeFile(wordsFile, editorOutput.wordsContent, 'utf-8');
 
+      // Register composition in Root.tsx
+      const rootFile = path.resolve('remotion', 'Root.tsx');
+      let rootSrc = await fs.readFile(rootFile, 'utf-8');
+      const importLine = `import { ${editorOutput.compositionName} } from './compositions/${compositionId}';\n`;
+      const compositionBlock = `\n      <Composition\n        id="${editorOutput.compositionName}"\n        component={${editorOutput.compositionName}}\n        durationInFrames={${editorOutput.totalDurationFrames}}\n        fps={VIDEO_FPS}\n        width={RESOLUTIONS.portrait.width}\n        height={RESOLUTIONS.portrait.height}\n      />`;
+      if (!rootSrc.includes(importLine.trim())) {
+        rootSrc = rootSrc.replace('import { VIDEO_FPS', `${importLine}import { VIDEO_FPS`);
+        rootSrc = rootSrc.replace('    </>\n  );\n};', `${compositionBlock}\n    </>\n  );\n};`);
+        await fs.writeFile(rootFile, rootSrc, 'utf-8');
+        console.log(`[edit] Registered ${editorOutput.compositionName} in Root.tsx`);
+      }
+
       console.log(`[edit] Wrote composition ${compositionId}.tsx and words file`);
     } else {
-      console.log(`[edit] Composition ${compositionId}.tsx already exists — skipping generation`);
+      // Check if registered — if not, delete and regenerate
+      const rootFile = path.resolve('remotion', 'Root.tsx');
+      const rootSrc = await fs.readFile(rootFile, 'utf-8');
+      if (!rootSrc.includes(`"${compositionId}"`)) {
+        console.log(`[edit] ${compositionId} exists but not registered in Root.tsx — deleting for regeneration`);
+        await fs.unlink(compositionFile).catch(() => {});
+        await fs.unlink(wordsFile).catch(() => {});
+        // Throw so BullMQ retries and hits the generation branch
+        throw new Error(`${compositionId} not registered — deleted for regeneration, please retry`);
+      }
+      console.log(`[edit] Composition ${compositionId}.tsx already exists and registered — skipping generation`);
     }
 
     const outputPath = path.join(outputDir, 'edited.mp4');
